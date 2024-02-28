@@ -10,14 +10,15 @@ const signup = (req, res) => {
 	res.render("signup");
 };
 
-const saveUser = (req, res) => {
+const saveUser = async (req, res) => {
 	const { name, email, password } = req.body;
 
-    // check for user existance
-    const userExist = User.findOne({email: email})
-    if (userExist) {
-        return res.send('user deja exist !!')
-    }
+	// check for user existance
+	const user = await User.findOne({ email: email });
+	if (user) {
+        console.log(user);
+		return res.send("user deja exist !!");
+	}
 	// cypting password before saving it
 	bcrypt.hash(password, 10, async (err, hashedPassword) => {
 		const newUser = new User({
@@ -29,6 +30,7 @@ const saveUser = (req, res) => {
 		console.log(newUser);
 		try {
 			await newUser.save();
+			req.session.user = newUser._id;
 			return res.redirect("/");
 		} catch (error) {
 			console.error("signup error: ", error);
@@ -40,4 +42,36 @@ const saveUser = (req, res) => {
 const login = (req, res) => {
 	res.render("login");
 };
-export { index, signup, login, saveUser };
+
+const checkUser = async (req, res) => {
+	const { email, password } = req.body;
+
+	const user = await User.findOne({ email: email });
+	if (user) {
+		try {
+			const match = await bcrypt.compare(password, user.password);
+			if (match) {
+				req.session.user = user._id;
+				console.log("session is setup");
+				// res.send("logged in " + user.name);
+				res.redirect("/");
+			} else {
+				res.send("user or password are not correct");
+			}
+		} catch (error) {
+			console.error("error:", error);
+			res.status(500).send(
+				"An error occurred while comparing passwords."
+			);
+		}
+	} else {
+		res.send("User not found");
+	}
+};
+
+// logout
+function logout(req, res) {
+	req.session.destroy();
+	res.redirect('/')
+}
+export { index, signup, login, saveUser, checkUser, logout };
